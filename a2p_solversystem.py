@@ -347,7 +347,7 @@ class SolverSystem():
         else:
             return False
         #self.mySOLVER_SPIN_ACCURACY = math.degrees(math.atan(1 / accuracydivider))
-        #self.mySOLVER_SPIN_ACCURACY = self.mySOLVER_POS_ACCURACY
+        self.mySOLVER_SPIN_ACCURACY = self.mySOLVER_POS_ACCURACY
         if float(assemblysize) / self.mySOLVER_POS_ACCURACY > 1e8:
             return False
         else:
@@ -364,7 +364,7 @@ class SolverSystem():
 
     def solveSystemWithMode(self,doc):
         self.level_of_accuracy=1
-        self.failurecounter = 5
+        #self.failurecounter = 5
         startTime = int(round(time.time() * 1000))
         self.loadSystem(doc)
         if self.status == "loadingDependencyError":
@@ -396,25 +396,32 @@ class SolverSystem():
                 
                 
                 #self.solutionToParts(doc)
-                self.level_of_accuracy+=1 
+                 
                 
-                               
+                Msg('POS ACCURACY: %0.8f mm\t\tSPIN ACCURACY: %0.8f deg ' % (self.mySOLVER_POS_ACCURACY, self.mySOLVER_SPIN_ACCURACY))
+                    #Msg('SPIN ACCURACY: {}\n'.format(self.mySOLVER_SPIN_ACCURACY))
+                Msg( '--->LEVEL OF ACCURACY :{} DONE!\n'.format(self.level_of_accuracy) ) 
+                 
+                self.level_of_accuracy+=1
+                self.mySOLVER_POS_ACCURACY *= 1.0e-1              
                 #FreeCADGui.updateGui()
-                if self.level_of_accuracy == MAX_LEVEL_ACCURACY: 
-                    Msg('POS ACCURACY: %0.8f mm\t\tSPIN ACCURACY: %0.8f deg ' % (self.mySOLVER_POS_ACCURACY, self.mySOLVER_SPIN_ACCURACY))
-                    #Msg('SPIN ACCURACY: {}\n'.format(self.mySOLVER_SPIN_ACCURACY))
-                    Msg( '--->LEVEL OF ACCURACY :{} DONE!\n'.format(self.level_of_accuracy) )                   
+                if self.level_of_accuracy == MAX_LEVEL_ACCURACY or not self.calcSpinAccuracy():
+                    Msg( "TotalTime (ms): %d\n" % (totalTime - startTime)) 
+#                     Msg('POS ACCURACY: %0.8f mm\t\tSPIN ACCURACY: %0.8f deg ' % (self.mySOLVER_POS_ACCURACY, self.mySOLVER_SPIN_ACCURACY))
+#                     #Msg('SPIN ACCURACY: {}\n'.format(self.mySOLVER_SPIN_ACCURACY))
+#                     Msg( '--->LEVEL OF ACCURACY :{} DONE!\n'.format(self.level_of_accuracy) )                   
                     break
                 
-                self.mySOLVER_POS_ACCURACY *= 1.0e-1
-                if not self.calcSpinAccuracy():
-                    Msg('POS ACCURACY: %0.8f mm\t\tSPIN ACCURACY: %0.8f deg ' % (self.mySOLVER_POS_ACCURACY, self.mySOLVER_SPIN_ACCURACY))
-                    #Msg('SPIN ACCURACY: {}\n'.format(self.mySOLVER_SPIN_ACCURACY))
-                    Msg( '--->LEVEL OF ACCURACY :{} DONE!\n'.format(self.level_of_accuracy) ) 
-                    Msg( "TotalTime (ms): %d\n" % (totalTime - startTime))
-                    break
                 
                 self.loadSystem(doc)
+                    
+#                     Msg('POS ACCURACY: %0.8f mm\t\tSPIN ACCURACY: %0.8f deg ' % (self.mySOLVER_POS_ACCURACY, self.mySOLVER_SPIN_ACCURACY))
+#                     #Msg('SPIN ACCURACY: {}\n'.format(self.mySOLVER_SPIN_ACCURACY))
+#                     Msg( '--->LEVEL OF ACCURACY :{} DONE!\n'.format(self.level_of_accuracy) ) 
+#                     Msg( "TotalTime (ms): %d\n" % (totalTime - startTime))
+                    #break
+                
+                
                 #self.failurecounter = 5
                 #self.calcSpinAccuracy()
                 #self.prepareRestart()
@@ -487,8 +494,8 @@ class SolverSystem():
         
         self.partialSolverCurrentStage = PARTIAL_SOLVE_STAGE1
         
-        self.mySOLVER_POS_ACCURACY *= 1.0e-1
-        self.calcSpinAccuracy()
+        #self.mySOLVER_POS_ACCURACY *= 1.0e-1
+        #self.calcSpinAccuracy()
         #mainWorklist = []
         while self.partialSolverCurrentStage != PARTIAL_SOLVE_END:
             #print "evaluating stage = ", self.partialSolverCurrentStage
@@ -531,9 +538,9 @@ class SolverSystem():
 #                     if self.partialSolverCurrentStage == PARTIAL_SOLVE_STAGE3:
 #                         self.mySOLVER_POS_ACCURACY *= 1e-1
 #                         self.calcSpinAccuracy()
-                    if (self.partialSolverCurrentStage == PARTIAL_SOLVE_STAGE4) :
-                        self.mySOLVER_POS_ACCURACY *= 10
-                        self.calcSpinAccuracy()
+#                     if (self.partialSolverCurrentStage == PARTIAL_SOLVE_STAGE4) :
+#                         self.mySOLVER_POS_ACCURACY *= 10
+#                         self.calcSpinAccuracy()
                     workList = []
                     break 
                                 
@@ -574,10 +581,10 @@ class SolverSystem():
 
             # Perform the move
             for w in workList:                
-                w.move(doc)
+                w.move(doc, self)
                 # Enable those 2 lines to see the computation progress on screen
-                #w.applySolution(doc, self)
-                #FreeCADGui.updateGui()
+#                 w.applySolution(doc, self)
+#                 FreeCADGui.updateGui()
 
             # The accuracy is good, apply the solution to FreeCAD's objects
             if (maxPosError <   self.mySOLVER_POS_ACCURACY and
@@ -591,7 +598,7 @@ class SolverSystem():
                 
                 for r in workList:                    
                     r.applySolution(doc,self) 
-                    #FreeCADGui.updateGui()  
+                    FreeCADGui.updateGui()  
                     for dep in r.dependencies:
                         if dep.Enabled:
                             #self.progress_bar.next()
@@ -620,8 +627,8 @@ class SolverSystem():
                     for rig in workList:
                         if rig.maxAxisError > self.mySOLVER_SPIN_ACCURACY or rig.maxPosError > self.mySOLVER_POS_ACCURACY:
                             Msg("Error on Rigid {}\n".format(rig.label))
-                            Msg("    PosError {}\n".format(rig.maxPosError))
-                            Msg("    AxisError {}\n".format(rig.maxAxisError))
+                            Msg("    PosError {}  | Accuracy {}\n".format(rig.maxPosError, self.mySOLVER_POS_ACCURACY))
+                            Msg("    AxisError {} | Accuracy {}\n".format(rig.maxAxisError, self.mySOLVER_SPIN_ACCURACY))
                             for r in rig.linkedRigids:
                                 if r.tempfixed and not r.fixed:
                                     Msg("unfixed Rigid {}\n".format(r.label))
