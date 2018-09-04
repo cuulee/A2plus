@@ -111,6 +111,8 @@ class Rigid():
         self.posDOF = a2p_libDOF.initPosDOF #each rigid has DOF for position
         self.rotDOF = a2p_libDOF.initRotDOF #each rigid has DOF for rotation
         #dof are useful only for animation at the moment? maybe it can be used to set tempfixed property
+        
+        
     def prepareRestart(self):
         self.tempfixed = self.fixed
         self.calcSpinCenter()
@@ -176,7 +178,7 @@ class Rigid():
         if solverStage == PARTIAL_SOLVE_STAGE1:
             if not self.tempfixed: #skip already fixed objs
                 #print 'current dof = ', rig.currentDOF()
-                DebugMsg(A2P_DEBUG_2, "    eval {}\n".format(self.label))
+                DebugMsg(A2P_DEBUG_1,"    eval {}\n".format(self.label))
                 
                 if self.linkedTempFixedDOF()==0: #found a fully constrained obj to tempfixed rigids
                     for j in self.depsPerLinkedRigids.keys(): #look on each linked obj
@@ -186,7 +188,7 @@ class Rigid():
                                 if not dep.Done and not dep.Enabled:
                                     #dep.enable([dep.currentRigid, dep.dependedRigid])
                                     candidates.extend([dep.currentRigid, dep.dependedRigid])                                        
-                                    DebugMsg(A2P_DEBUG_2, "        {}\n".format(dep))
+                                    DebugMsg(A2P_DEBUG_1,"        {}\n".format(dep))
                     #if len(outputRigidList)>0: #found something!
                         #print '        Solve them!'                            
             
@@ -196,7 +198,7 @@ class Rigid():
             #enable only involved dep, then set them as tempfixed        
             
             if not self.tempfixed: #skip already fixed objs  
-                DebugMsg(A2P_DEBUG_2, "    eval {}\n".format(self.label))                
+                DebugMsg(A2P_DEBUG_1,"    eval {}\n".format(self.label))                
                 if self.areAllParentTempFixed(): #linked only to fixed rigids                                                
                     
                     #print rig.linkedRigids 
@@ -213,17 +215,25 @@ class Rigid():
                                     #dep.enable([dep.currentRigid, dep.dependedRigid])
                                     candidates.extend([dep.currentRigid, dep.dependedRigid])
                                     #self.solvedCounter += 1
-                                    DebugMsg(A2P_DEBUG_2, "        {}\n".format(dep))
+                                    DebugMsg(A2P_DEBUG_1,"        {}\n".format(dep))
             
         
         elif solverStage == PARTIAL_SOLVE_STAGE3:
             if not self.tempfixed:
+                DebugMsg(A2P_DEBUG_1,"    eval {}\n".format(self.label))
                 for rig in self.linkedRigids:
                     if not rig.tempfixed:
-                        if (len(self.dofPOSPerLinkedRigids[rig]) + len(self.dofROTPerLinkedRigids[rig])) == 0:
+#                         print 'Check Merging ', self.label,' ',rig.label
+#                         print 'dofPOS self to rig ', len(self.dofPOSPerLinkedRigids[rig])
+#                         print 'dofROT self to rig ', len(self.dofROTPerLinkedRigids[rig])
+#                         print 'dofPOS rig to self ', len(rig.dofPOSPerLinkedRigids[self])
+#                         print 'dofROT rig to self ', len(rig.dofROTPerLinkedRigids[self])
+                        if (len(self.dofPOSPerLinkedRigids[rig]) + len(self.dofROTPerLinkedRigids[rig])) == 0: #\
+                            #or (len(rig.dofPOSPerLinkedRigids[self]) + len(rig.dofROTPerLinkedRigids[self])) == 0:
                             #rig is fully constrained 
                             candidates.append(self)
                             candidates.append(rig)
+                            DebugMsg(A2P_DEBUG_1,"        {}".format(rig.label))
                             return candidates 
                 
             return candidates
@@ -236,6 +246,7 @@ class Rigid():
 
         elif solverStage == PARTIAL_SOLVE_STAGE5:
             if not self.checkIfAllDone():
+                DebugMsg(A2P_DEBUG_1,"        {}\n".format(self.label))
                 candidates.extend([self])
                 
 
@@ -303,27 +314,27 @@ class Rigid():
             axis2 = self.savedPlacement[ind].Rotation.Axis
             angle = math.degrees(axis2.getAngle(axis1))
 
-            if absPosMove >= solver.mySOLVER_POS_ACCURACY * 0.01 or angle >= solver.mySOLVER_SPIN_ACCURACY * 0.01:
+            #if absPosMove >= solver.mySOLVER_POS_ACCURACY * 0.01 or angle >= solver.mySOLVER_SPIN_ACCURACY * 0.01:
                 #for objname in self.objectName:
-                obj = doc.getObject(self.objectName[ind])            
-                obj.Placement = self.placement[ind]
+            obj = doc.getObject(self.objectName[ind])            
+            obj.Placement = self.placement[ind]
 
     def getRigidCenter(self):
         _currentRigid = FreeCAD.ActiveDocument.getObject(self.objectName[0])
         return _currentRigid.Shape.BoundBox.Center
     
-    def calcSpinCenterDepsEnabled(self):
-        newSpinCenter = Base.Vector(self.spinCenter)
-        countRefPoints = 0
-        for dep in self.dependencies:
-            if dep.Enabled:
-                if dep.refPoint != None:
-                    newSpinCenter = newSpinCenter.add(dep.refPoint)
-                    countRefPoints += 1
-        if countRefPoints > 0:
-            newSpinCenter.multiply(1.0/countRefPoints)
-            self.spinCenter = newSpinCenter
-    
+#     def calcSpinCenterDepsEnabled(self):
+#         newSpinCenter = Base.Vector(self.spinCenter)
+#         countRefPoints = 0
+#         for dep in self.dependencies:
+#             if dep.Enabled:
+#                 if dep.refPoint != None:
+#                     newSpinCenter = newSpinCenter.add(dep.refPoint)
+#                     countRefPoints += 1
+#         if countRefPoints > 0:
+#             newSpinCenter.multiply(1.0/countRefPoints)
+#             self.spinCenter = newSpinCenter
+#     
 #     def calcSpinBasicDataDepsEnabled(self):
 #         xmin = 0
 #         xmax = 0
@@ -435,48 +446,171 @@ class Rigid():
             if dep.refPoint.z > zmax: zmax=dep.refPoint.z
         self.refPointsBoundBoxSize = math.sqrt( (xmax-xmin)**2 + (ymax-ymin)**2 + (zmax-zmin)**2 )
 
+#     def calcMoveData(self, doc, solver):
+#         if self.tempfixed: return
+#         
+#         
+#         depRefPoints = []
+#         depMoveVectors = [] #collect Data to compute central movement of rigid
+#         #
+#         self.maxPosError = 0.0
+#         self.maxAxisError = 0.0
+#         self.countSpinVectors = 0
+#         self.moveVectorSum = Base.Vector(0,0,0)
+# 
+#         for dep in self.dependencies:
+#             if dep.Enabled:
+#                 refPoint, moveVector = dep.getMovement()
+#                 if refPoint is None or moveVector is None: continue     # Should not happen
+#     
+#                 depRefPoints.append(refPoint)
+#                 depMoveVectors.append(moveVector)
+#     
+#                 # Calculate max move error
+#                 if moveVector.Length > self.maxPosError: self.maxPosError = moveVector.Length
+#     
+#                 # Accomulate all the movements for later average calculations
+#                 self.moveVectorSum = self.moveVectorSum.add(moveVector)
+# 
+#         # Calculate the average of all the movements
+#         if len(depMoveVectors) > 0:
+#             self.moveVectorSum = self.moveVectorSum.multiply(1.0/len(depMoveVectors))
+# 
+#         #compute rotation caused by refPoint-attractions and axes mismatch
+#         if len(depMoveVectors) > 0 and self.spinCenter != None:
+#             self.spin = Base.Vector(0,0,0)
+# 
+#             #realMoveVectorSum = FreeCAD.Vector(self.moveVectorSum)
+#             #realMoveVectorSum.multiply(WEIGHT_LINEAR_MOVE)
+#             for i in range(0,len(depRefPoints)):
+#                 try:
+#                     vec1 = depRefPoints[i].sub(self.spinCenter) # 'aka Radius'
+#                     vec2 = depMoveVectors[i].sub(self.moveVectorSum) # 'aka Force'
+#                     axis = vec1.cross(vec2) #torque-vector
+#                     vec1.multiply(1.0e15)
+#                     vec1.normalize()
+#                     vec1.multiply(self.refPointsBoundBoxSize)
+#                     vec3 = vec1.add(vec2)
+#                     beta = vec3.getAngle(vec1)
+#                     axis.multiply(1.0e15)
+#                     axis.normalize()
+#                     axis.multiply(math.degrees(beta)*WEIGHT_REFPOINT_ROTATION) #here use degrees
+#                     self.spin = self.spin.add(axis)
+#                     self.countSpinVectors += 1
+#                 except:
+#                     #Msg('Exception rig.calcMoveData() Vec1= {} -- Axis = {}'.format(vec1,axis))
+#                     pass #numerical exception above, no spin !
+#             
+# #             for i in range(len(depRefPoints)):
+# #                 
+# #                 vec1 = depRefPoints[i].sub(self.spinCenter) # 'aka Radius'
+# #                 vec2 = depMoveVectors[i].sub(self.moveVectorSum) # 'aka Force'
+# #                 axis = vec1.cross(vec2) #torque-vector
+# #                 try: 
+# #                     axis.multiply(1.0e6) <== this is faster !
+# #                     axis.normalize() #<== is still able to fail. Needs to be inside of try section...
+# #                     axis.multiply(-deltaAngle)
+# #                 except:
+# #                     pass
+# #                 
+# #                 
+# #                 
+# #                 try:
+# #                     vec1.normalize()
+# #                 except:
+# #                     vec1.multiply(10**6)
+# #                     print i,'-->',vec1.Length
+# #                     vec1.normalize()
+# #                 vec1.multiply(self.refPointsBoundBoxSize)
+# #                 vec3 = vec1.add(vec2)
+# #                 beta = vec3.getAngle(vec1)
+# #                 try:
+# #                     axis.normalize()
+# #                 except:
+# #                     axis.multiply(10**6)
+# #                     axis.normalize()
+# #                 axis.multiply(math.degrees(beta)*WEIGHT_REFPOINT_ROTATION) #here use degrees
+# #                 self.spin = self.spin.add(axis)
+# #                 self.countSpinVectors += 1
+#                 
+#             
+#             
+#             #adjust axis' of the dependencies //FIXME (align,opposed,none)
+# 
+#             for dep in self.dependencies:
+#                 if dep.Enabled:
+#                     rotation = dep.getRotation(solver)
+#     
+#                     if rotation is None: continue       # No rotation for that dep
+#     
+#                     # Accumulate all rotations for later average calculation
+#                     self.spin = self.spin.add(rotation)
+#                     self.countSpinVectors += 1
+#     
+#                     # Calculate max rotation error
+#                     self.maxAxisError = max(self.spin.Length, self.maxAxisError)
+#                     #if axisErr > self.maxAxisError : self.maxAxisError = axisErr
+
+
     def calcMoveData(self, doc, solver):
-        if self.tempfixed: return
-        
-        
-        depRefPoints = []
-        depMoveVectors = [] #collect Data to compute central movement of rigid
+        if self.tempfixed or self.fixed: return
+        depRefPoints = []               #collect Data to compute central movement of rigid
+        depMoveVectors = []             #all moveVectors
+        depRefPoints_Spin = []          #refPoints, relevant for spin generation...
+        depMoveVectors_Spin = []        #depMoveVectors, relevant for spin generation...
         #
         self.maxPosError = 0.0
         self.maxAxisError = 0.0
         self.countSpinVectors = 0
         self.moveVectorSum = Base.Vector(0,0,0)
+        self.spin = None
 
         for dep in self.dependencies:
-            if dep.Enabled:
-                refPoint, moveVector = dep.getMovement()
-                if refPoint is None or moveVector is None: continue     # Should not happen
-    
-                depRefPoints.append(refPoint)
-                depMoveVectors.append(moveVector)
-    
-                # Calculate max move error
-                if moveVector.Length > self.maxPosError: self.maxPosError = moveVector.Length
-    
-                # Accomulate all the movements for later average calculations
-                self.moveVectorSum = self.moveVectorSum.add(moveVector)
+            refPoint, moveVector = dep.getMovement()
+            if refPoint is None or moveVector is None: continue     # Should not happen
+
+            depRefPoints.append(refPoint)
+            depMoveVectors.append(moveVector)
+            
+            if dep.useRefPointSpin:
+                depRefPoints_Spin.append(refPoint)
+                depMoveVectors_Spin.append(moveVector)
+            
+            '''
+            if not self.tempfixed:
+                a2plib.drawSphere(refPoint, a2plib.RED)
+                a2plib.drawVector(refPoint, refPoint.add(moveVector), a2plib.RED)
+            '''
+                
+            # Calculate max move error
+            if moveVector.Length > self.maxPosError: self.maxPosError = moveVector.Length
+
+            # Accomulate all the movements for later average calculations
+            self.moveVectorSum = self.moveVectorSum.add(moveVector)
 
         # Calculate the average of all the movements
         if len(depMoveVectors) > 0:
             self.moveVectorSum = self.moveVectorSum.multiply(1.0/len(depMoveVectors))
 
-        #compute rotation caused by refPoint-attractions and axes mismatch
-        if len(depMoveVectors) > 0 and self.spinCenter != None:
-            self.spin = Base.Vector(0,0,0)
 
-            #realMoveVectorSum = FreeCAD.Vector(self.moveVectorSum)
-            #realMoveVectorSum.multiply(WEIGHT_LINEAR_MOVE)
-            for i in range(0,len(depRefPoints)):
+        #compute rotation caused by refPoint-attractions
+        if len(depMoveVectors_Spin) >= 2:
+            #FIXME
+            self.spin = Base.Vector(0,0,0)
+            tmpSpinCenter = depRefPoints_Spin[0] # assume rigid spinning around first depRefPoint
+            
+            # Eliminate the offset of depRefPoint[0] from all depMoveVectors
+            offsetVector = Base.Vector(depMoveVectors_Spin[0]) # make a copy
+            for i in range(0, len(depMoveVectors_Spin)):
+                depMoveVectors_Spin[i] = depMoveVectors_Spin[i].sub(offsetVector)
+
+            for i in range(1, len(depRefPoints_Spin)): # do not use index 0, rigid is assumed spinning around this point
                 try:
-                    vec1 = depRefPoints[i].sub(self.spinCenter) # 'aka Radius'
-                    vec2 = depMoveVectors[i].sub(self.moveVectorSum) # 'aka Force'
+                    vec1 = depRefPoints_Spin[i].sub(tmpSpinCenter) # 'aka Radius'
+                    #if vec1.Length < 1e-6: continue
+                    vec2 = depMoveVectors_Spin[i] # 'aka Force'
                     axis = vec1.cross(vec2) #torque-vector
-                    vec1.multiply(1.0e10)
+                    vec1.multiply(1.0e6)
                     vec1.normalize()
                     vec1.multiply(self.refPointsBoundBoxSize)
                     vec3 = vec1.add(vec2)
@@ -487,58 +621,27 @@ class Rigid():
                     self.spin = self.spin.add(axis)
                     self.countSpinVectors += 1
                 except:
-                    #print 'Exception CalcMoveData()'
                     pass #numerical exception above, no spin !
-            
-#             for i in range(len(depRefPoints)):
-#                 
-#                 vec1 = depRefPoints[i].sub(self.spinCenter) # 'aka Radius'
-#                 vec2 = depMoveVectors[i].sub(self.moveVectorSum) # 'aka Force'
-#                 axis = vec1.cross(vec2) #torque-vector
-#                 try: 
-#                     axis.multiply(1.0e6) <== this is faster !
-#                     axis.normalize() #<== is still able to fail. Needs to be inside of try section...
-#                     axis.multiply(-deltaAngle)
-#                 except:
-#                     pass
-#                 
-#                 
-#                 
-#                 try:
-#                     vec1.normalize()
-#                 except:
-#                     vec1.multiply(10**6)
-#                     print i,'-->',vec1.Length
-#                     vec1.normalize()
-#                 vec1.multiply(self.refPointsBoundBoxSize)
-#                 vec3 = vec1.add(vec2)
-#                 beta = vec3.getAngle(vec1)
-#                 try:
-#                     axis.normalize()
-#                 except:
-#                     axis.multiply(10**6)
-#                     axis.normalize()
-#                 axis.multiply(math.degrees(beta)*WEIGHT_REFPOINT_ROTATION) #here use degrees
-#                 self.spin = self.spin.add(axis)
-#                 self.countSpinVectors += 1
-                
-            
-            
-            #adjust axis' of the dependencies //FIXME (align,opposed,none)
 
+        #compute rotation caused by axis' of the dependencies //FIXME (align,opposed,none)
+        if len(self.dependencies) > 0:
+            if self.spin == None: self.spin = Base.Vector(0,0,0)
+            
             for dep in self.dependencies:
-                if dep.Enabled:
-                    rotation = dep.getRotation(solver)
-    
-                    if rotation is None: continue       # No rotation for that dep
-    
-                    # Accumulate all rotations for later average calculation
-                    self.spin = self.spin.add(rotation)
-                    self.countSpinVectors += 1
-    
-                    # Calculate max rotation error
-                    self.maxAxisError = max(self.spin.Length, self.maxAxisError)
-                    #if axisErr > self.maxAxisError : self.maxAxisError = axisErr
+                rotation = dep.getRotation(solver)
+                if rotation is None: continue       # No rotation for that dep
+
+                # Accumulate all rotations for later average calculation
+                self.spin = self.spin.add(rotation)
+                self.countSpinVectors += 1
+
+        # Calculate max rotation error
+        if self.spin != None:
+            axisErr = self.spin.Length
+            if axisErr > self.maxAxisError : self.maxAxisError = axisErr
+            
+
+
 
     def move(self,doc, solver):
         if self.tempfixed: return
@@ -555,27 +658,65 @@ class Rigid():
         rotation = None
         if (self.spin != None and self.spin.Length != 0.0 and self.countSpinVectors != 0):
             spinAngle = self.spin.Length / float(self.countSpinVectors)
-            if spinAngle>15.0: spinAngle=15.0 # do not accept more degrees
-            if spinAngle> solver.mySOLVER_SPIN_ACCURACY*1.0e-3:
-                try:
-                    spinStep = spinAngle/(SPINSTEP_DIVISOR) #it was 250.0
-                    self.spin.multiply(1.0e10)
-                    self.spin.normalize()
-                    rotation = FreeCAD.Rotation(self.spin, spinStep)
-                    center = self.spinCenter
-                except:
-                    print 'Exception SpinAngle'
-                    pass
+            #if spinAngle>15.0: spinAngle=15.0 # do not accept more degrees
+            #if spinAngle> solver.mySOLVER_SPIN_ACCURACY*1.0e-3:
+            try:
+                spinStep = spinAngle/SPINSTEP_DIVISOR #it was 250.0
+                self.spin.multiply(1.0e6)
+                self.spin.normalize()
+                rotation = FreeCAD.Rotation(self.spin, spinStep)
+                center = self.spinCenter
+            except:
+                #Msg('Exception SpinAngle rig.move() spin = {}'.format(axis))
+                center = None
+                rotation = None
+                pass
 
         if center != None and rotation != None:
             pl = FreeCAD.Placement(moveDist,rotation,center)
             self.applyPlacementStep(pl)
         else:
-            if moveDist.Length > 1.0e-10:
-                pl = FreeCAD.Placement()
-                pl.move(moveDist)
-                self.applyPlacementStep(pl)
+            #if moveDist.Length > 1.0e-10:
+            pl = FreeCAD.Placement()
+            pl.move(moveDist)
+            self.applyPlacementStep(pl)
 
+
+    def retrieveDOFInfo(self):
+        if not self.tempfixed:  #skip already fixed objs
+            self.depsPerLinkedRigids.clear()
+            self.dofPOSPerLinkedRigids.clear()
+            self.dofROTPerLinkedRigids.clear()
+            for linkedRig in self.linkedRigids:
+                tmplinkedDeps = []
+                tmpLinkedPointDeps = []
+                for dep in self.dependencies:
+                    if linkedRig==dep.dependedRigid:
+                        #be sure pointconstraints are at the end of the list
+                        if dep.isPointConstraint :
+                            tmpLinkedPointDeps.append(dep)
+                        else:
+                            tmplinkedDeps.append(dep)
+                #add at the end the point constraints
+                tmpLinkedPointDeps = list(set(tmpLinkedPointDeps))                
+                tmplinkedDeps.extend(tmpLinkedPointDeps)
+                tmplinkedDeps = list(set(tmplinkedDeps)) 
+                self.depsPerLinkedRigids[linkedRig] = tmplinkedDeps
+        
+            #dofPOSPerLinkedRigid is a dict where for each 
+            for linkedRig in self.depsPerLinkedRigids.keys():
+                linkedRig.pointConstraints = []
+                _dofPos = a2p_libDOF.initPosDOF #each rigid has DOF for position        
+                _dofRot = a2p_libDOF.initRotDOF #each rigid has DOF for rotation
+                for dep in self.depsPerLinkedRigids[linkedRig]:
+                    _dofPos, _dofRot = dep.calcDOF(_dofPos,_dofRot, linkedRig.pointConstraints)
+                self.dofPOSPerLinkedRigids[linkedRig] = _dofPos
+                self.dofROTPerLinkedRigids[linkedRig] = _dofRot
+            
+            #ok each rigid has a dict for each linked objects,
+            #so we now know the list of linked objects and which 
+            #dof rot and pos both limits.
+            
 
     
     def currentDOF(self):
@@ -649,16 +790,26 @@ class Rigid():
 
     def mergeRigid(self, solver, rigid):
         #function which includes a rigid in another
-        
+        #print 'Try to merge ', self.label,' ', rigid.label
         #first insert the rigid object name in the current objectname
         if rigid.objectName in self.objectName or self.objectName in rigid.objectName:
             return
-        self.objectName.extend(rigid.objectName)
         
+        self.objectName.extend(rigid.objectName)
+        #print 'Merging ', self.label,' ', rigid.label
+        selflabel = self.label
         #print '    merge ', rigid.label , ' in ', self.label
-        self.label += '#' + rigid.label
-        self.placement.extend(rigid.placement)
-        self.savedPlacement.extend(rigid.savedPlacement)
+        self.label += '&&' + rigid.label
+        
+        
+        
+        
+#         print '    Dep in self ', selflabel
+#         for i in self.dependencies:
+#             print '            ',i
+#         print '    Dep in rigid ' , rigid.label
+#         for i in rigid.dependencies:
+#             print '            ',i
         
         #now merge all dependencies
         self.dependencies.extend(rigid.dependencies)
@@ -676,16 +827,39 @@ class Rigid():
                 #dep.setCurrentRigid(self)          
             #print '        ', dep
         
+#         print '    Dep in fused obj '
+#         for i in self.dependencies:
+#             print '        ',i
+        
+        
+        self.placement.extend(rigid.placement)
+        self.savedPlacement.extend(rigid.savedPlacement)
+        
+        
         
         self.linkedRigids.extend(rigid.linkedRigids)
         self.linkedRigids.remove(self)
         self.linkedRigids.remove(rigid)
-        self.dofPOSPerLinkedRigids.update(rigid.dofPOSPerLinkedRigids)
-        del self.dofPOSPerLinkedRigids[self]
-        del self.dofPOSPerLinkedRigids[rigid]
-        self.dofROTPerLinkedRigids.update(rigid.dofROTPerLinkedRigids)
-        del self.dofROTPerLinkedRigids[self]
-        del self.dofROTPerLinkedRigids[rigid]
+        self.linkedRigids = list(set(self.linkedRigids))
+        
+        #self.retrieveDOFInfo()
+        
+#         
+#         
+#         self.dofPOSPerLinkedRigids.update(rigid.dofPOSPerLinkedRigids)
+#         del self.dofPOSPerLinkedRigids[self]
+#         del self.dofPOSPerLinkedRigids[rigid]
+#         self.dofROTPerLinkedRigids.update(rigid.dofROTPerLinkedRigids)
+#         del self.dofROTPerLinkedRigids[self]
+#         del self.dofROTPerLinkedRigids[rigid]
+#         self.depsPerLinkedRigids.update(rigid.depsPerLinkedRigids)
+#         del self.depsPerLinkedRigids[self]
+#         del self.depsPerLinkedRigids[rigid]
+        
+#         print self.linkedRigids
+#         print self.depsPerLinkedRigids.keys()
+#         print self.dofPOSPerLinkedRigids.keys()
+#         print self.dofROTPerLinkedRigids.keys()
         
         for rig in solver.rigids:
             for ind in range(len(rig.linkedRigids)):
@@ -693,14 +867,25 @@ class Rigid():
                     rig.linkedRigids[ind] = self
             rig.linkedRigids = list(set(rig.linkedRigids))
 
-            for ind in range(len(rig.dofPOSPerLinkedRigids)):
-                if rigid in rig.dofPOSPerLinkedRigids.keys():
-                    rig.dofPOSPerLinkedRigids[self] = rig.dofPOSPerLinkedRigids[rigid]
-                    del rig.dofPOSPerLinkedRigids[rigid]
+
+
+#             for ind in range(len(rig.dofPOSPerLinkedRigids)):
+#                 if rigid in rig.dofPOSPerLinkedRigids.keys():
+#                     rig.dofPOSPerLinkedRigids[self] = rig.dofPOSPerLinkedRigids[rigid]
+#                     del rig.dofPOSPerLinkedRigids[rigid]
                     
-            for ind in range(len(rig.dofROTPerLinkedRigids)):
-                if rigid in rig.dofROTPerLinkedRigids.keys():
-                    rig.dofROTPerLinkedRigids[self] = rig.dofROTPerLinkedRigids[rigid]
-                    del rig.dofROTPerLinkedRigids[rigid]
+            for ind in range(len(rig.depsPerLinkedRigids)):
+                if rigid in rig.depsPerLinkedRigids.keys():
+                    rig.depsPerLinkedRigids[self] = rig.depsPerLinkedRigids[rigid]
+                    del rig.depsPerLinkedRigids[rigid]
                     
+#             for ind in range(len(rig.dofROTPerLinkedRigids)):
+#                 if rigid in rig.dofROTPerLinkedRigids.keys():
+#                     rig.dofROTPerLinkedRigids[self] = rig.dofROTPerLinkedRigids[rigid]
+#                     del rig.dofROTPerLinkedRigids[rigid]
         solver.rigids.remove(rigid)
+        for rig in solver.rigids:
+            rig.retrieveDOFInfo()
+                    
+        
+        self.calcSpinCenter()
